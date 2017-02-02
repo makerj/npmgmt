@@ -29,7 +29,7 @@ static const uint8_t protocol_form[6][30] = {//dumy data included!
 	's', 'o', 'm', 'e', 't', 'h', 'i', 'n', 'g', NULL, // message
 	},{								// total len : ?
 	0x02, 							// OPCODE (delete PDL)
-									// Length ? 
+									// Length ?
 	},{								// total len : 5
 	0x03, 							// OPCODE (delete PDL)
 	0x00, 0x00, 0x00, 0x00,			// Length 0
@@ -38,7 +38,7 @@ static const uint8_t protocol_form[6][30] = {//dumy data included!
 	0x00, 0x00, 0x00, 0x00, 		// Length ?
 	0x00, 0x00, 0x00, 0x00,			//input port_num here
 	},
-	
+
 	/*-----------------*/
 	/*- DUMMY OPCODE  -*/
 	/*-----------------*/
@@ -51,11 +51,11 @@ static const uint8_t protocol_form[6][30] = {//dumy data included!
 	}
 };
 
-static void make_packet_add_pdl(char* buf){
+static void make_packet_add_pdl(char* buf) {
 	printf("input name of PDL to add\t: ");
 
-	uint32_t len_getline;	//maybe dummy parameter		
-	char* console_buf = NULL;	
+	uint32_t len_getline;    //maybe dummy parameter
+	char* console_buf = NULL;
 	ssize_t console_buf_len = getline(&console_buf, &len_getline, stdin);
 	int len = console_buf_len = console_buf_len - 1; //= namelen, in console_buf, '\n' included
 
@@ -78,43 +78,41 @@ static void make_packet_add_pdl(char* buf){
 
 static int debug_phase = 0;
 
-int	main(){
+int main(int argc, char** argv) {
 	int client_socket;
 	int client_socket_new;
 	int port_num = 40000;
-	int i =  0;
-	uint32_t len_getline;	//maybe dummy parameter
-	size_t len = 0;			//USED FOR getline()
+	int i = 0;
+	uint32_t len_getline;    //maybe dummy parameter
+	size_t len = 0;            //USED FOR getline()
 	ssize_t console_buf_len;
 	char* console_buf = NULL;
 	char buf[BUF_SIZE];
 	char str1[BUF_SIZE];
 	struct sockaddr_in server_addr;
-	
+
 	client_socket = socket(PF_INET, SOCK_STREAM, 0);
 	if(client_socket < 0)
 		perror("socket 생성 실패"), exit(EXIT_FAILURE);
 
 	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family		= AF_INET;
-	server_addr.sin_addr.s_addr	= inet_addr("127.0.0.1");		//MUST CHANGE Loopbakc address!!! 
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");        //MUST CHANGE Loopbakc address!!!
 	//server_addr.sin_port		= htons(port_num = 40000);
-	for(port_num = 40000, i = -1; i == -1; port_num++){
-		server_addr.sin_port		 = htons(port_num);
-		i = connect(client_socket, (struct sockaddr*)&server_addr, sizeof(server_addr));
-		if(40004 < port_num){
+	for(port_num = 40000, i = -1; i == -1; port_num++) {
+		server_addr.sin_port = htons(port_num);
+		i = connect(client_socket, (struct sockaddr*) &server_addr, sizeof(server_addr));
+		if(40004 < port_num) {
 			printf("40000~ 40004 tcp port, all failed to connect. exit\n");
 			exit(1);
 		}
 	}
-	
-	
 
 
 	int opcode;
 	memset(buf, 0x00, BUF_SIZE);
 	printf("1: add pdl\n2: remove pdl\n3: show pdl list\n4: show pdl selected\n-----------------------\n");
-	
+
 	console_buf_len = getline(&console_buf, &len_getline, stdin);
 	console_buf[console_buf_len - 1] = '\0';
 	printf("%s\n", console_buf);
@@ -122,12 +120,12 @@ int	main(){
 	free(console_buf), console_buf = NULL;
 
 	if(OPCODE_MESSAGE <= opcode && opcode <= OPCODE_ADD_DUMMY) {
-		for(i = 0; i < protocol_form_len[opcode]; i++){	//FORMAT -> buf
-			buf[i] = protocol_form[opcode][i];				//will not be used at final version
+		for(i = 0; i < protocol_form_len[opcode]; i++) {    //FORMAT -> buf
+			buf[i] = protocol_form[opcode][i];                //will not be used at final version
 		}
 	}
 
-	switch(opcode){
+	switch(opcode) {
 		case OPCODE_MESSAGE:
 			//sending dummy data
 			break;
@@ -169,7 +167,7 @@ int	main(){
 
 		default:
 			printf("opcode error!! opcode : 0x%02x\n send error message to server & exit\n\n", opcode);
-			for(i = 0; i < protocol_form_len[OPCODE_MESSAGE]; i++){
+			for(i = 0; i < protocol_form_len[OPCODE_MESSAGE]; i++) {
 				buf[i] = protocol_form[OPCODE_MESSAGE][i];
 			}
 
@@ -177,26 +175,26 @@ int	main(){
 
 			u32tob(buf + OPCODE_LEN, len);
 			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(len);
-			fprintf(buf + HEADER_LEN ,"UI input error, nothing to send!\n");
+			fprintf(buf + HEADER_LEN, "UI input error, nothing to send!\n");
 			writeAll(client_socket, buf, len + HEADER_LEN);
 			exit(1);
 	}
 
-	writeAll(client_socket, buf, HEADER_LEN + be32toh(*(uint32_t*)(buf + OPCODE_LEN)));
+	writeAll(client_socket, buf, HEADER_LEN + be32toh(*(uint32_t*) (buf + OPCODE_LEN)));
 
 	printf("what U send :(lenth : %d)\n%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n\n\n",
-		protocol_form_len[opcode],
-		buf[0], buf[1], buf[2], buf[3], buf[4], 
-		buf[5], buf[6], buf[7], buf[8], buf[9],
-		buf[10], buf[11], buf[12], buf[13], buf[14], 
-		buf[15], buf[16], buf[17], buf[18], buf[19]);
-		
+		   protocol_form_len[opcode],
+		   buf[0], buf[1], buf[2], buf[3], buf[4],
+		   buf[5], buf[6], buf[7], buf[8], buf[9],
+		   buf[10], buf[11], buf[12], buf[13], buf[14],
+		   buf[15], buf[16], buf[17], buf[18], buf[19]);
+
 	//SHOW SIGNAL FROM ENGINE
 	readAll(client_socket, buf, HEADER_LEN);
-	
 
-	opcode	= buf[0];
-	len	= be32toh(*(uint32_t*)(buf + OPCODE_LEN));
+
+	opcode = buf[0];
+	len = be32toh(*(uint32_t*) (buf + OPCODE_LEN));
 	printf("message U receive\topcode %d\tlen %d\n", opcode, len);
 	readAll(client_socket, buf, len);
 	printf("%s\n\nendUI\n\n\n", buf);
