@@ -17,11 +17,14 @@
 //not allowed to make empty opcode between  FIRST_OPCODE~LAST_OPCODE    //
 //      because engine code use "func[opcode](~~~)"                     //
 //----------------------------------------------------------------------//
-#define OPCODE_MESSAGE      0
-#define OPCODE_PDL_ADD      1
-#define OPCODE_PDL_REMOVE   2
-#define OPCODE_PDL_LIST     3
-#define OPCODE_PDL_GET      4
+typedef enum {
+	OPCODE_MESSAGE,
+	OPCODE_PDL_ADD,
+	OPCODE_PDL_REMOVE,
+	OPCODE_PDL_LIST,
+	OPCODE_PDL_GET,
+	OPCODE__COUNT__,
+} OPCode;
 
 #define FIRST_OPCODE        OPCODE_MESSAGE
 #define LAST_OPCODE         OPCODE_PDL_GET

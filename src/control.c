@@ -1,6 +1,3 @@
-#ifndef CONTROL_C
-#define CONTROL_C
-
 #include "../include/control.h"
 
 //void teststop(){};
@@ -47,7 +44,3 @@ int writeAll(const int socket, char* buf, const int len) {
 void onBufUint32(uint8_t* buf, const uint32_t num){
 	*(uint32_t*)buf = htobe32(num);
 }
-
-
-
-#endif

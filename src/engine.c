@@ -1,4 +1,3 @@
-
 #include <string.h>
 #include "control.c"
 
@@ -239,14 +238,3 @@ int main() {
 		testprintf("[engine loop end]\n\n\n");
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
