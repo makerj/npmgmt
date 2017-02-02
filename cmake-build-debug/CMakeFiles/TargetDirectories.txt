@@ -1,0 +1,3 @@
+/home/gurum/gitrepo/npmgmt/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/gurum/gitrepo/npmgmt/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/gurum/gitrepo/npmgmt/cmake-build-debug/CMakeFiles/ProtocolConverter.dir

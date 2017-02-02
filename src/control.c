@@ -1,7 +1,7 @@
 #ifndef CONTROL_C
 #define CONTROL_C
 
-#include "control.h"
+#include "../include/control.h"
 
 //void teststop(){};
 

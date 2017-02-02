@@ -1,0 +1,1 @@
+/usr/bin/cc   -std=gnu99 -g   CMakeFiles/ProtocolConverter.dir/src/control.c.o CMakeFiles/ProtocolConverter.dir/src/control_ui.c.o CMakeFiles/ProtocolConverter.dir/src/engine.c.o  -o ProtocolConverter 
