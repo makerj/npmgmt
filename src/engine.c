@@ -11,10 +11,10 @@
 #define streq(str1,str2)		strcmp(str1,str2)==0
 
 
-int debug_phase = 0;//for gdb 
+static int debug_phase = 0;//for gdb
 typedef void (*pdl_operate_funcs)(struct dummypdl*, char*, char*);
 
-int findPdlByPortnum(struct dummypdl * pdls, int port_num) {
+static int findPdlByPortnum(struct dummypdl * pdls, int port_num) {
 	int i;
 	for(i = 0; i < 100; i++) {
 		if(pdls[i].port_num == port_num) {
@@ -24,7 +24,7 @@ int findPdlByPortnum(struct dummypdl * pdls, int port_num) {
 	return i;
 }
 
-int findPdlByName(struct dummypdl * pdls, char* name) {
+static int findPdlByName(struct dummypdl * pdls, char* name) {
 	int i;
 	for(i = 0; i < 100; i++) {
 		if(!strcmp(pdls[i].name, name)) {
@@ -35,12 +35,12 @@ int findPdlByName(struct dummypdl * pdls, char* name) {
 	return i;
 }
 
-int sprintf_PDLdata(char* buf_mess, struct dummypdl pdl) {
+static int sprintf_PDLdata(char* buf_mess, struct dummypdl pdl) {
 	sprintf(buf_mess, "portnum:%d\t name:%s\tmessage:%s\n", pdl.port_num, pdl.name, pdl.message);
 	return strlen(buf_mess);
 }
 
-int setServerSocket(/*~~~~*/) {
+static int setServerSocket(/*~~~~*/) {
 	struct sockaddr_in server_addr;
 	int success			= -1;
 	int port_num		= TCP_PORT_USE;
@@ -75,7 +75,7 @@ int setServerSocket(/*~~~~*/) {
 	return server_socket;
 }
 
-int acceptUI(const int server_socket) {
+static int acceptUI(const int server_socket) {
 	int success = listen(server_socket, 5);
 	if(success < 0)
 		printf("대기상태 모드 설정 실패\n"), exit(1);
@@ -93,11 +93,11 @@ int acceptUI(const int server_socket) {
 	return ui_socket;
 }
 
-void uiMessageEcho(struct dummypdl * pdls, char* buf_data, char* buf_mess){
+static void uiMessageEcho(struct dummypdl * pdls, char* buf_data, char* buf_mess){
 	sprintf(buf_mess, "<message echo>\n%s\n", buf_data);
 }
 
-void addPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
+static void addPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	uint32_t data_len	= be32toh(*(uint32_t*)(buf_data - NAMELENTH_LEN));
 	uint32_t name_len	= be32toh(*(uint32_t*) buf_data);
 	uint32_t mess_len	= data_len - name_len - NAMELENTH_LEN;
@@ -113,7 +113,7 @@ void addPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 			pdls[target_num].port_num, pdls[target_num].name, pdls[target_num].message);
 }
 
-void removePdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
+static void removePdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	uint32_t target_num	= findPdlByName(pdls, buf_data);	//pdls[target_num]
 
 	if(target_num != 100) {
@@ -127,7 +127,7 @@ void removePdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	}
 }
 
-void getPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
+static void getPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	uint32_t target_num	= findPdlByName(pdls, buf_data);	//pdls[target_num]
 
 	if(target_num != 100) {
@@ -137,7 +137,7 @@ void getPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	}
 }
 
-void listPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
+static void listPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	uint32_t nwrite 	= 0;
 	uint32_t counter 	= 0;
 	uint32_t target_num = 0;
@@ -153,7 +153,7 @@ void listPdl(struct dummypdl * pdls, char* buf_data, char* buf_mess) {
 	buf_mess[nwrite] = '\0';
 }
 
-int ui_control_onmessage(int* pt_ui_socket, const int server_socket, struct dummypdl * pdls) {	
+static int ui_control_onmessage(int* pt_ui_socket, const int server_socket, struct dummypdl * pdls) {
 	/*	if(select()) {	//미구현
 		//if no input
 		//	return 0;
@@ -222,7 +222,7 @@ int ui_control_onmessage(int* pt_ui_socket, const int server_socket, struct dumm
  * ...__a
  * ...
  */
-int main() {
+int main(int argc, char** argv) {
 	struct sockaddr_in server_addr;
 	struct dummypdl pdls[100] = {0,};		//vector, heap등으로 변환 필요. 현재는 꽉차면 프로그램 터짐
 	int server_socket;

@@ -1,4 +1,11 @@
-#include "mgmt.c"
+#include <stdio.h>
+#include <memory.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include "mgmt.h"
 
 #define BUF_SIZE 100
 #define testprintf				printf
@@ -6,9 +13,9 @@
 
 //warning :these dummys cant 
 
-const uint32_t protocol_form_len[] = {20, 1, 1, 5, 1, 25};//NULL=> 0 isnt used for opcode
+static const uint32_t protocol_form_len[] = {20, 1, 1, 5, 1, 25};//NULL=> 0 isnt used for opcode
 
-const uint8_t protocol_form[6][30] = {//dumy data included!
+static const uint8_t protocol_form[6][30] = {//dumy data included!
 	{
 	0x00,							// OPCODE (message)
 	0x00, 0x00, 0x00, 0x0F,			// Length 15		//dummy data included
@@ -44,7 +51,7 @@ const uint8_t protocol_form[6][30] = {//dumy data included!
 	}
 };
 
-void make_packet_add_pdl(char* buf){
+static void make_packet_add_pdl(char* buf){
 	printf("input name of PDL to add\t: ");
 
 	uint32_t len_getline;	//maybe dummy parameter		
@@ -69,7 +76,7 @@ void make_packet_add_pdl(char* buf){
 	//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(len);
 }
 
-int debug_phase = 0;
+static int debug_phase = 0;
 
 int	main(){
 	int client_socket;
