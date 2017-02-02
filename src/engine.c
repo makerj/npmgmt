@@ -1,5 +1,10 @@
+#include <stdio.h>
 #include <string.h>
-#include "control.c"
+#include <stdlib.h>
+#include <unistd.h>
+#include <netinet/in.h>
+
+#include "mgmt.h"
 
 #define testprintf				printf
 #define EMPTY_PORT_NAME ""
@@ -199,7 +204,7 @@ int ui_control_onmessage(int* pt_ui_socket, const int server_socket, struct dumm
 	
 	//replying packet 'header' now
 	buf_output[0] = OPCODE_MESSAGE;			//protocol 'opcode' input
-	onBufUint32(buf_output + OPCODE_LEN, strlen(buf_mess));
+	u32tob(buf_output + OPCODE_LEN, strlen(buf_mess));
 	
 	//send reply to ui
 	writeAll(ui_socket, buf_output, strlen(buf_mess) + HEADER_LEN);

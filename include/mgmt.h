@@ -1,17 +1,6 @@
 #ifndef CONTROL_H
 #define CONTROL_H
 
-
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <byteswap.h>
-
 //-------------------------OPCODEs WARNING------------------------------//
 //opcode must start from 0                                              //
 //not allowed to make empty opcode between  FIRST_OPCODE~LAST_OPCODE    //
@@ -42,4 +31,30 @@ struct dummypdl{
 	char name[32];
 	char message[1024];
 };
+
+/**
+ * Blocking Read Call
+ * @param socket socket fd
+ * @param buf buffer
+ * @param len buffer length
+ * @return nread, -1 on error
+ */
+int readAll(const int socket, char* buf, const int len);
+
+/**
+ * Blocking Write Call
+ * @param socket socket fd
+ * @param buf buffer
+ * @param len  buffer length
+ * @return nwrite, -1 on error
+ */
+int writeAll(const int socket, char* buf, const int len);
+
+/**
+ * Write int32 on char*buf
+ * @param buf buffer pt
+ * @param num int to load on buffer(big-endian)
+ */
+void u32tob(uint8_t* buf, const uint32_t num);
+
 #endif

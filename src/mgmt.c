@@ -1,14 +1,16 @@
-#include "../include/control.h"
+#include <unistd.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <endian.h>
 
-//void teststop(){};
-
+#include "mgmt.h"
 
 int readAll(const int socket, char* buf, const int len) {
 	int nowread = 0;
 	int nread = 0;
 
 	while(nread < len){
-		nowread = read(socket, buf + nread, len - nread);
+		nowread = (int) read(socket, buf + nread, (size_t) (len - nread));
 		nread += nowread;
 		if(nowread == -1) {
 			printf("ERROR!! disconnected while readAll() function working\n");
@@ -17,7 +19,7 @@ int readAll(const int socket, char* buf, const int len) {
 	}
 
 	if(nread != len)
-		printf("ERROR!! %d more chars nread!!", nread - len);
+		printf("ERROR!! %d more chars nread!!\n", nread - len);
 	
 	return nread;
 }
@@ -27,7 +29,7 @@ int writeAll(const int socket, char* buf, const int len) {
 	int nwrite = 0;
 
 	while(nwrite < len){
-		nowwrite = write(socket, buf + nwrite, len - nwrite);
+		nowwrite = (int) write(socket, buf + nwrite, (size_t) (len - nwrite));
 		nwrite += nowwrite;
 		if(nowwrite == -1){
 			printf("ERROR!! disconnected while writeAll() function working\n");
@@ -36,11 +38,11 @@ int writeAll(const int socket, char* buf, const int len) {
 	}
 
 	if (nwrite != len)
-		printf("ERROR!! %d more chars nwrite!!", nwrite - len);
+		printf("ERROR!! %d more chars nwrite!!\n", nwrite - len);
 	
 	return nwrite;
 }
 
-void onBufUint32(uint8_t* buf, const uint32_t num){
+void u32tob(uint8_t* buf, const uint32_t num){
 	*(uint32_t*)buf = htobe32(num);
 }

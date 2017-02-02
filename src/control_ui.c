@@ -1,4 +1,4 @@
-#include "control.c"
+#include "mgmt.c"
 
 #define BUF_SIZE 100
 #define testprintf				printf
@@ -52,7 +52,7 @@ void make_packet_add_pdl(char* buf){
 	ssize_t console_buf_len = getline(&console_buf, &len_getline, stdin);
 	int len = console_buf_len = console_buf_len - 1; //= namelen, in console_buf, '\n' included
 
-	onBufUint32(buf + HEADER_LEN, console_buf_len);
+	u32tob(buf + HEADER_LEN, console_buf_len);
 	//*(uint32_t*)(buf + HEADER_LEN) = htobe32(console_buf_len);	//put namelen in buf
 	strncpy(buf + HEADER_LEN + NAMELENTH_LEN, console_buf, console_buf_len);
 	free(console_buf), console_buf = NULL;
@@ -64,8 +64,8 @@ void make_packet_add_pdl(char* buf){
 	strncpy((buf + HEADER_LEN + NAMELENTH_LEN + len), console_buf, console_buf_len);
 	len = NAMELENTH_LEN + len + console_buf_len; //data_len = ~~ + name_leng + mess_leng
 	free(console_buf), console_buf = NULL;
-			
-	onBufUint32(buf + OPCODE_LEN, len);
+
+	u32tob(buf + OPCODE_LEN, len);
 	//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(len);
 }
 
@@ -139,8 +139,8 @@ int	main(){
 			console_buf_len = getline(&console_buf, &len_getline, stdin); //주의: \n까지 같이넣
 			console_buf_len--;
 			strncpy(buf + HEADER_LEN, console_buf, console_buf_len);
-			
-			onBufUint32(buf + OPCODE_LEN, console_buf_len);
+
+			u32tob(buf + OPCODE_LEN, console_buf_len);
 			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(strlen(console_buf));
 			free(console_buf), console_buf = NULL;
 			break;
@@ -154,8 +154,8 @@ int	main(){
 			console_buf_len = getline(&console_buf, &len_getline, stdin); //주의: \n까지 같이넣
 			console_buf_len--;
 			strncpy(buf + HEADER_LEN, console_buf, console_buf_len);
-			
-			onBufUint32(buf + OPCODE_LEN, console_buf_len);
+
+			u32tob(buf + OPCODE_LEN, console_buf_len);
 			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(strlen(console_buf));
 			free(console_buf), console_buf = NULL;
 			break;
@@ -167,8 +167,8 @@ int	main(){
 			}
 
 			len = atoi("UI input error, nothing to send!\n");
-			
-			onBufUint32(buf + OPCODE_LEN, len);
+
+			u32tob(buf + OPCODE_LEN, len);
 			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(len);
 			fprintf(buf + HEADER_LEN ,"UI input error, nothing to send!\n");
 			writeAll(client_socket, buf, len + HEADER_LEN);
