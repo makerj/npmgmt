@@ -7,85 +7,123 @@
 
 #include "mgmt.h"
 
-#define BUF_SIZE 100
+#define BUF_SIZE 1024
 #define testprintf				printf
-#define OPCODE_ADD_DUMMY 5
 
-//warning :these dummys cant 
+//static const uint32_t protocol_form_len[] = {19, 1, 1, 5, 1};
 
-static const uint32_t protocol_form_len[] = {20, 1, 1, 5, 1, 25};//NULL=> 0 isnt used for opcode
+//static const uint8_t protocol_form[6][30] = {//dumy data included!
+//	{
+//	0x00,					// OPCODE (message) DUMMY
+//	0x00, 0x00, 0x00, 0x0D,	// Length 14
+//	'p', 'l', 'e', 'a', 's', 'e', '\n',	'e', 'c', 'h', 'o', ' ', 'm', 'e', // message
+//	},{
+//	0x01,					// OPCODE (add PDL)
+//	/*leng :4 byte*/		// Length = ?
+//	/*leng :4 byte*/		// Name Length = ?
+//	/*leng :?? byte*/		// Name
+//	/*leng :?? byte*/		// message
+//	},{
+//	0x02, 					// OPCODE (delete PDL)
+//	/*leng :4 byte*/		// Length = ?
+//	/*leng :?? byte*/		// NAME = ?
+//	},{						// total len : 5
+//	0x03, 					// OPCODE (delete PDL)
+//	0x00, 0x00, 0x00, 0x00,	// Length 0
+//	},{						// total len : 9
+//	0x04, 					// OPCODE (add PDL)
+//	/*leng :4 byte*/		// Length = ?
+//	/*leng :?? byte*/		// NAME = ?
+//	}
+//};
 
-static const uint8_t protocol_form[6][30] = {//dumy data included!
-	{
-	0x00,							// OPCODE (message)
-	0x00, 0x00, 0x00, 0x0F,			// Length 15		//dummy data included
-	'p', 'l', 'e', 'a', 's', 'e', '\n',	// Name
-	'e', 'c', 'h', 'o', ' ', 'm', 'e', NULL, // message
-	},{
-	0x01,							// OPCODE (add PDL)
-	0x00, 0x00, 0x00, 0x14,			// Length 20		//dummy data included
-	0x00, 0x00, 0x00, 0x06, 		// Name Length (include NULL)
-	'a', '.', 'x', 'm', 'l', NULL,	// Name
-	's', 'o', 'm', 'e', 't', 'h', 'i', 'n', 'g', NULL, // message
-	},{								// total len : ?
-	0x02, 							// OPCODE (delete PDL)
-									// Length ?
-	},{								// total len : 5
-	0x03, 							// OPCODE (delete PDL)
-	0x00, 0x00, 0x00, 0x00,			// Length 0
-	},{								// total len : 9
-	0x04, 							// OPCODE (add PDL)
-	0x00, 0x00, 0x00, 0x00, 		// Length ?
-	0x00, 0x00, 0x00, 0x00,			//input port_num here
-	},
+typedef void (*PdlProtocolFunc)(char*);
 
-	/*-----------------*/
-	/*- DUMMY OPCODE  -*/
-	/*-----------------*/
-	{
-	0x01,							// OPCODE (add PDL DUMMY VERSION!!)
-	0x00, 0x00, 0x00, 0x14,			// Length 20		//dummy data included
-	0x00, 0x00, 0x00, 0x06, 		// Name Length (include NULL)
-	'a', '.', 'x', 'm', 'l', NULL,	// Name
-	's', 'o', 'm', 'e', 't', 'h', 'i', 'n', 'g', NULL, // message
-	}
-};
+static void send_message(char* buf_data){
+	printf("send message to engine (dummy message)\n");
+	int len = atoi("testmessage: echo me");
 
-static void make_packet_add_pdl(char* buf) {
+	u32tob(buf_data - DATALEN_LEN, len);
+	sprintf(buf_data, "testmessage: echo me");
+}
+
+static void add_pdl(char* buf_data) {
 	printf("input name of PDL to add\t: ");
 
-	uint32_t len_getline;    //maybe dummy parameter
+	size_t len_getline;    //maybe dummy parameter
 	char* console_buf = NULL;
 	ssize_t console_buf_len = getline(&console_buf, &len_getline, stdin);
 	int len = console_buf_len = console_buf_len - 1; //= namelen, in console_buf, '\n' included
 
-	u32tob(buf + HEADER_LEN, console_buf_len);
-	//*(uint32_t*)(buf + HEADER_LEN) = htobe32(console_buf_len);	//put namelen in buf
-	strncpy(buf + HEADER_LEN + NAMELENTH_LEN, console_buf, console_buf_len);
+	u32tob(buf_data, console_buf_len);
+	//*(uint32_t*)(buf_data) = htobe32(console_buf_len);	//put namelen in buf
+	strncpy(buf_data + NAMELEN_LEN, console_buf, console_buf_len);
 	free(console_buf), console_buf = NULL;
 
 	printf("input message of PDL to add\t: ");
 	console_buf_len = getline(&console_buf, &len_getline, stdin);
 	console_buf_len--; //'\n' nothanks
 
-	strncpy((buf + HEADER_LEN + NAMELENTH_LEN + len), console_buf, console_buf_len);
-	len = NAMELENTH_LEN + len + console_buf_len; //data_len = ~~ + name_leng + mess_leng
+	strncpy((buf_data + NAMELEN_LEN + len), console_buf, console_buf_len);
+	len = NAMELEN_LEN + len + console_buf_len; //data_len = ~~ + name_leng + mess_leng
+	
+	u32tob(buf_data - DATALEN_LEN, len);
 	free(console_buf), console_buf = NULL;
-
-	u32tob(buf + OPCODE_LEN, len);
-	//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(len);
 }
 
-static int debug_phase = 0;
+
+static void remove_pdl(char* buf_data) {
+	printf("input PDL name to del : ");
+
+	size_t len_getline;    //maybe dummy parameter
+	char* console_buf = NULL;
+	ssize_t console_buf_len = getline(&console_buf, &len_getline, stdin);
+	console_buf_len--;
+	strncpy(buf_data, console_buf, console_buf_len);
+
+	u32tob(buf_data - DATALEN_LEN, console_buf_len);
+	free(console_buf), console_buf = NULL;
+}
+
+static void list_pdl(char* buf_data){
+	puts("U select pdl list");
+	//DO NOTHING, ONLY NEEDED IS opcode & leng. leng is setted as memset, opcode will be set after
+}
+
+static void get_pdl(char* buf_data){
+	printf("U select pdl get -> input PDL name to get : ");
+
+	size_t len_getline;    //maybe dummy parameter
+	char* console_buf = NULL;
+	ssize_t console_buf_len = getline(&console_buf, &len_getline, stdin);
+	console_buf_len--;
+	strncpy(buf_data, console_buf, console_buf_len);
+
+	u32tob(buf_data - DATALEN_LEN, console_buf_len);
+	free(console_buf), console_buf = NULL;
+}
+
+static void send_error_message(char* buf_data){
+	printf("opcode error!!\n send error message to server\n\n");
+	int len = atoi("UI input error, nothing to send!\n");
+	u32tob(buf_data - DATALEN_LEN, len);
+	sprintf(buf_data, "UI input error, nothing to send!\n");
+}
+
+static PdlProtocolFunc fill_protocol[OPCODE__COUNT__ + 1] = {
+	send_message,		//send dummy message
+	add_pdl, remove_pdl, list_pdl, get_pdl,	//operations in real use
+	send_error_message	//send error message
+};
 
 int main(int argc, char** argv) {
 	int client_socket;
 	int client_socket_new;
 	int port_num = 40000;
 	int i = 0;
-	uint32_t len_getline;    //maybe dummy parameter
-	size_t len = 0;            //USED FOR getline()
-	ssize_t console_buf_len;
+	int len = 0;
+	size_t len_getline;    	//dummy parameter??
+	ssize_t console_buf_len;//USED FOR getline() len
 	char* console_buf = NULL;
 	char buf[BUF_SIZE];
 	char str1[BUF_SIZE];
@@ -108,10 +146,10 @@ int main(int argc, char** argv) {
 		}
 	}
 
-
+	
+	printf("1: add pdl\n2: remove pdl\n3: show pdl list\n4: show pdl selected\n-----------------------\n");
 	int opcode;
 	memset(buf, 0x00, BUF_SIZE);
-	printf("1: add pdl\n2: remove pdl\n3: show pdl list\n4: show pdl selected\n-----------------------\n");
 
 	console_buf_len = getline(&console_buf, &len_getline, stdin);
 	console_buf[console_buf_len - 1] = '\0';
@@ -119,87 +157,41 @@ int main(int argc, char** argv) {
 	opcode = atoi(console_buf);
 	free(console_buf), console_buf = NULL;
 
-	if(OPCODE_MESSAGE <= opcode && opcode <= OPCODE_ADD_DUMMY) {
-		for(i = 0; i < protocol_form_len[opcode]; i++) {    //FORMAT -> buf
-			buf[i] = protocol_form[opcode][i];                //will not be used at final version
+	if(opcode < 0 || OPCODE__COUNT__ <= opcode){//if OPCODE INPUT ERROR
+		opcode = OPCODE__COUNT__;//NO OPCODE LIKE THIS, temporary value for error message sending
+	}
+
+	buf[0] = (opcode != OPCODE__COUNT__)? opcode : 0;	//fill protocol opcode,   error message is also message opcode
+	fill_protocol[opcode](buf + HEADER_LEN);			//fill protocol data and data_len
+
+	write_all(client_socket, buf, HEADER_LEN + be32toh(*(uint32_t*) (buf + OPCODE_LEN)));//send protocol
+
+	testprintf("what U send :(lenth : %d)\n0x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n0x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n\n\n",
+		   be32toh(*(uint32_t*) (buf + OPCODE_LEN)),
+		   buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9],
+		   buf[10], buf[11], buf[12], buf[13], buf[14], buf[15], buf[16], buf[17], buf[18], buf[19]);
+
+	
+	read_all(client_socket, buf, HEADER_LEN);
+	len = be32toh(*(uint32_t*) (buf + OPCODE_LEN));
+	//SHOW REPLY FROM ENGINE
+	printf("message U receive\topcode %d\tlen %d\n", opcode, len);
+	if(len < BUF_SIZE){
+		read_all(client_socket, buf, len);
+		printf("%s", buf);
+	} else {
+		int nread = 0;
+		for(int left = len; 0 < left; left -= nread){
+			int read_len = (BUF_SIZE < left)? BUF_SIZE : left;
+			nread = read_all(client_socket, buf, read_len);
+			if(nread < 0){//read ERROR
+				break;
+			}
+			printf("%s",buf);
 		}
 	}
-
-	switch(opcode) {
-		case OPCODE_MESSAGE:
-			//sending dummy data
-			break;
-
-		case OPCODE_ADD_DUMMY:
-			puts("U select pdl add(dummy data send)");
-			//sending dummy data   // already inputed
-			break;
-
-		case OPCODE_PDL_ADD:
-			make_packet_add_pdl(buf);
-			break;
-
-		case OPCODE_PDL_REMOVE:
-			printf("input PDL name to del : ");
-			console_buf_len = getline(&console_buf, &len_getline, stdin); //주의: \n까지 같이넣
-			console_buf_len--;
-			strncpy(buf + HEADER_LEN, console_buf, console_buf_len);
-
-			u32tob(buf + OPCODE_LEN, console_buf_len);
-			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(strlen(console_buf));
-			free(console_buf), console_buf = NULL;
-			break;
-
-		case OPCODE_PDL_LIST:
-			puts("U select pdl list");
-			break;
-
-		case OPCODE_PDL_GET:
-			printf("U select pdl get -> input PDL name to get : ");
-			console_buf_len = getline(&console_buf, &len_getline, stdin); //주의: \n까지 같이넣
-			console_buf_len--;
-			strncpy(buf + HEADER_LEN, console_buf, console_buf_len);
-
-			u32tob(buf + OPCODE_LEN, console_buf_len);
-			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(strlen(console_buf));
-			free(console_buf), console_buf = NULL;
-			break;
-
-		default:
-			printf("opcode error!! opcode : 0x%02x\n send error message to server & exit\n\n", opcode);
-			for(i = 0; i < protocol_form_len[OPCODE_MESSAGE]; i++) {
-				buf[i] = protocol_form[OPCODE_MESSAGE][i];
-			}
-
-			len = atoi("UI input error, nothing to send!\n");
-
-			u32tob(buf + OPCODE_LEN, len);
-			//*(uint32_t*)(buf + OPCODE_LEN) = htobe32(len);
-			fprintf(buf + HEADER_LEN, "UI input error, nothing to send!\n");
-			writeAll(client_socket, buf, len + HEADER_LEN);
-			exit(1);
-	}
-
-	writeAll(client_socket, buf, HEADER_LEN + be32toh(*(uint32_t*) (buf + OPCODE_LEN)));
-
-	printf("what U send :(lenth : %d)\n%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n\n\n",
-		   protocol_form_len[opcode],
-		   buf[0], buf[1], buf[2], buf[3], buf[4],
-		   buf[5], buf[6], buf[7], buf[8], buf[9],
-		   buf[10], buf[11], buf[12], buf[13], buf[14],
-		   buf[15], buf[16], buf[17], buf[18], buf[19]);
-
-	//SHOW SIGNAL FROM ENGINE
-	readAll(client_socket, buf, HEADER_LEN);
-
-
-	opcode = buf[0];
-	len = be32toh(*(uint32_t*) (buf + OPCODE_LEN));
-	printf("message U receive\topcode %d\tlen %d\n", opcode, len);
-	readAll(client_socket, buf, len);
-	printf("%s\n\nendUI\n\n\n", buf);
+	printf("\n\nendUI\n\n\n");
 
 	close(client_socket);
-
 	return 0;
 }

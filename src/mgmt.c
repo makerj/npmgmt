@@ -2,44 +2,44 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <endian.h>
+#include <errno.h>
 
 #include "mgmt.h"
 
-int readAll(const int socket, char* buf, const int len) {
-	int nowread = 0;
-	int nread = 0;
+size_t read_all(const int socket, char* buf, const uint32_t len) {
+	size_t nowread = 0;
+	size_t nread = 0;
 
-	while(nread < len){
-		nowread = (int) read(socket, buf + nread, (size_t) (len - nread));
+	while(nread < len){	
+		nowread = read(socket, buf + nread, len - nread);
 		nread += nowread;
 		if(nowread == -1) {
-			printf("ERROR!! disconnected while readAll() function working\n");
 			return nowread;
 		}
 	}
 
 	if(nread != len)
-		printf("ERROR!! %d more chars nread!!\n", nread - len);
-	
-	return nread;
+		printf("ERROR!! %d more chars nread!!\n", (int)(nread - len));
+	return (int)nread;
 }
 
-int writeAll(const int socket, char* buf, const int len) {
-	int nowwrite = 0;
-	int nwrite = 0;
+size_t write_all(const int socket, char* buf, const uint32_t len) {
+	size_t nowwrite = 0;
+	size_t nwrite = 0;
 
 	while(nwrite < len){
-		nowwrite = (int) write(socket, buf + nwrite, (size_t) (len - nwrite));
+		nowwrite = write(socket, buf + nwrite, len - nwrite);
 		nwrite += nowwrite;
+		
 		if(nowwrite == -1){
-			printf("ERROR!! disconnected while writeAll() function working\n");
+			printf("ERROR!! disconnected while write_all() function working, nwirte :%d, nowwrite: %d\n", nwrite, nowwrite);
 			return nowwrite;
 		}
 	}
 
-	if (nwrite != len)
-		printf("ERROR!! %d more chars nwrite!!\n", nwrite - len);
-	
+	if(nwrite != len){
+		printf("ERROR!! %d more chars nwrite!!\n", (int)(nwrite - len));
+	}
 	return nwrite;
 }
 

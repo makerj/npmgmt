@@ -11,51 +11,43 @@
 #define streq(str1, str2)        strcmp(str1,str2)==0
 
 
-static int debug_phase = 0;//for gdb
-typedef void (* pdl_operate_funcs)(struct dummypdl*, char*, char*);
+//static int debug_phase = 0;//for gdb
+typedef char* (* PdlOperateFuncs)(struct dummypdl*, char*);
 
-static int findPdlByPortnum(struct dummypdl* pdls, int port_num) {
-	int i;
-	for(i = 0; i < 100; i++) {
-		if(pdls[i].port_num == port_num) {
-			break;
-		}
-	}
-	return i;
-}
-
-static int findPdlByName(struct dummypdl* pdls, char* name) {
+static int find_pdl_by_name(struct dummypdl* pdls, char* name) {
 	int i;
 	for(i = 0; i < 100; i++) {
 		if(!strcmp(pdls[i].name, name)) {
 			break;
 		}
 	}
-
 	return i;
 }
 
-static int sprintf_PDLdata(char* buf_mess, struct dummypdl pdl) {
+static int sprintf_pdl(char* buf_mess, struct dummypdl pdl) {
 	sprintf(buf_mess, "portnum:%d\t name:%s\tmessage:%s\n", pdl.port_num, pdl.name, pdl.message);
 	return strlen(buf_mess);
 }
 
-static int setServerSocket(/*~~~~*/) {
+static void fprintf_pdl(FILE* stream, struct dummypdl pdl) {
+	fprintf(stream, "portnum:%d\t name:%s\tmessage:%s\n", pdl.port_num, pdl.name, pdl.message);
+}
+
+static int set_socket(/*~~~~*/) {
 	struct sockaddr_in server_addr;
 	int success = -1;
-	int port_num = TCP_PORT_USE;
+	int port_num = NPMGMT_DEFAULT_PORT;
 	int server_socket = socket(PF_INET, SOCK_STREAM, 0);
 
 	if(server_socket == -1) {
 		printf("server socket 생성 실패\n");
 		exit(1);
 	}
-	//printf("server socket 생성 완료\n");
+	//testprintf("server socket 생성 완료\n");
 
 	memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	//server_addr.sin_port		= htons(port_num);
 
 	while(1) {
 		server_addr.sin_port = htons(port_num);
@@ -63,8 +55,8 @@ static int setServerSocket(/*~~~~*/) {
 
 		if(success == 0) {
 			break;
-		} else if(!(port_num < TCP_PORT_USE + TCP_PORT_TRY)) {
-			printf("failed bind() in %d~ %d tcp port. exit\n", TCP_PORT_USE, TCP_PORT_USE + TCP_PORT_TRY - 1);
+		} else if(!(port_num < NPMGMT_DEFAULT_PORT + TCP_PORT_TRY)) {
+			printf("failed bind() in %d~ %d tcp port. exit\n", NPMGMT_DEFAULT_PORT, NPMGMT_DEFAULT_PORT + TCP_PORT_TRY - 1);
 			exit(1);
 		}
 
@@ -75,7 +67,7 @@ static int setServerSocket(/*~~~~*/) {
 	return server_socket;
 }
 
-static int acceptUI(const int server_socket) {
+static int accept_ui(const int server_socket) {
 	int success = listen(server_socket, 5);
 	if(success < 0)
 		printf("대기상태 모드 설정 실패\n"), exit(1);
@@ -93,65 +85,158 @@ static int acceptUI(const int server_socket) {
 	return ui_socket;
 }
 
-static void uiMessageEcho(struct dummypdl* pdls, char* buf_data, char* buf_mess) {
-	sprintf(buf_mess, "<message echo>\n%s\n", buf_data);
+
+static char* ui_message_echo(struct dummypdl* pdls, char* buf_data) {
+    char*   buf_out;
+    size_t  buf_out_len;
+    FILE*   stream = open_memstream(&buf_out, &buf_out_len);
+    int     data_len = 0;
+    
+    char op = OPCODE_MESSAGE;
+    fwrite(&op,       1, 1, stream);
+    fwrite(&data_len, 4, 1, stream);    //data_len is not yet ready, re-inputed later
+    fprintf(stream, "<message echo>\n%s\n", buf_data);
+    fclose(stream);
+
+    data_len = strlen(buf_out + HEADER_LEN);
+    sprintf(buf_out + OPCODE_LEN, "%d", data_len);
+	return buf_out;
 }
 
-static void addPdl(struct dummypdl* pdls, char* buf_data, char* buf_mess) {
-	uint32_t data_len = be32toh(*(uint32_t*) (buf_data - NAMELENTH_LEN));
+static char* add_pdl(struct dummypdl* pdls, char* buf_data) {
+
+	uint32_t data_len = be32toh(*(uint32_t*) (buf_data - NAMELEN_LEN));
 	uint32_t name_len = be32toh(*(uint32_t*) buf_data);
-	uint32_t mess_len = data_len - name_len - NAMELENTH_LEN;
-	uint32_t target_num = findPdlByName(pdls, EMPTY_PORT_NAME);        //pdls[target_num]
+	uint32_t mess_len = data_len - name_len - NAMELEN_LEN;
+	uint32_t target_num = find_pdl_by_name(pdls, EMPTY_PORT_NAME);        //pdls[target_num]
 
 	pdls[target_num].port_num = target_num;
-	strncpy(pdls[target_num].name, buf_data + NAMELENTH_LEN, name_len);
-	strncpy(pdls[target_num].message, buf_data + NAMELENTH_LEN + name_len, mess_len);
+	strncpy(pdls[target_num].name, buf_data + NAMELEN_LEN, name_len);
+	strncpy(pdls[target_num].message, buf_data + NAMELEN_LEN + name_len, mess_len);
 	pdls[target_num].name[name_len] = '\0';            //prevnet contamination(not deleted by memset, just name[0]='\0')
 	pdls[target_num].message[mess_len] = '\0';
 
-	sprintf(buf_mess, "New pdl in port%d\nname : %s\nmess : %s\n",
+
+
+    char*   buf_out;
+    size_t  buf_out_len;
+    FILE*   stream = open_memstream(&buf_out, &buf_out_len);    
+
+    char op = OPCODE_MESSAGE;
+    data_len = 0;//dummy
+    fwrite(&op,       1, 1, stream);
+    fwrite(&data_len, 4, 1, stream);//no len yet
+    fprintf(stream, "New pdl in port%d\nname : %s\nmess : %s\n",
 			pdls[target_num].port_num, pdls[target_num].name, pdls[target_num].message);
+    fclose(stream);
+//    data_len = strlen(buf_out + HEADER_LEN);
+//    sprintf(buf_out + OPCODE_LEN, "%d", data_len);
+	return buf_out;
 }
 
-static void removePdl(struct dummypdl* pdls, char* buf_data, char* buf_mess) {
-	uint32_t target_num = findPdlByName(pdls, buf_data);    //pdls[target_num]
+static char* remove_pdl(struct dummypdl* pdls, char* buf_data) {
+	uint32_t target_num = find_pdl_by_name(pdls, buf_data);    //pdls[target_num]
+
+    char*   buf_out;
+    size_t  buf_out_len;
+    FILE*   stream = open_memstream(&buf_out, &buf_out_len);    
+
+    char op = OPCODE_MESSAGE;
+    int data_len = 0;
+    fwrite(&op,       1, 1, stream);
+    fwrite(&data_len, 4, 1, stream);            //header
 
 	if(target_num != 100) {
-		sprintf(buf_mess, "delete pdl data\n", target_num);
 		pdls[target_num].port_num = 0;
-		pdls[target_num].name[0] = NULL;
-		pdls[target_num].message[0] = NULL;
+		pdls[target_num].name[0] = '\0';
+		pdls[target_num].message[0] = '\0';
 
+		fprintf(stream, "delete pdl data\n");
 	} else {    //no pdl find
-		sprintf(buf_mess, "CAN NOT FIND pdl U request!\n");
+		fprintf(stream, "CAN NOT FIND pdl U request!\n");
 	}
+    fclose(stream);
+
+//    data_len = strlen(buf_out + HEADER_LEN);
+//    sprintf(buf_out + OPCODE_LEN, "%d", data_len);
+	return buf_out;
 }
 
-static void getPdl(struct dummypdl* pdls, char* buf_data, char* buf_mess) {
-	uint32_t target_num = findPdlByName(pdls, buf_data);    //pdls[target_num]
+static char* get_pdl(struct dummypdl* pdls, char* buf_data) {
+	uint32_t target_num = find_pdl_by_name(pdls, buf_data);    //pdls[target_num]
+   
+    char*   buf_out;
+    size_t  buf_out_len;
+    FILE*   stream = open_memstream(&buf_out, &buf_out_len);    
+
+    char op = OPCODE_MESSAGE;
+    int data_len = 0;
+    fwrite(&op,       1, 1, stream);
+    fwrite(&data_len, 4, 1, stream);            //header
 
 	if(target_num != 100) {
-		sprintf_PDLdata(buf_mess, pdls[target_num]);
+		fprintf_pdl(stream, pdls[target_num]);
 	} else {    //no pdl find
-		sprintf(buf_mess, "CAN NOT FIND pdl U request!\n");
+		fprintf(stream, "CAN NOT FIND pdl U request!\n");
 	}
+    fclose(stream);
+
+//    data_len = strlen(buf_out + HEADER_LEN);
+//    sprintf(buf_out + OPCODE_LEN, "%d", data_len);
+	return buf_out;
 }
 
-static void listPdl(struct dummypdl* pdls, char* buf_data, char* buf_mess) {
-	uint32_t nwrite = 0;
+static char* list_pdl(struct dummypdl* pdls, char* buf_data) {
 	uint32_t counter = 0;
 	uint32_t target_num = 0;
 
+    char*   buf_out;
+    size_t  buf_out_len;
+    FILE*   stream = open_memstream(&buf_out, &buf_out_len);    
+
+    char op = OPCODE_MESSAGE;
+    int data_len = 0;
+    fwrite(&op,       1, 1, stream);
+    fwrite(&data_len, 4, 1, stream);
+
 	for(target_num = 0; target_num < 100; target_num++) {    //pdls[] size100 is temp code!!!
 		if(!streq(pdls[target_num].name, EMPTY_PORT_NAME)) {
-			nwrite += sprintf_PDLdata(buf_mess + nwrite, pdls[target_num]);
+			fprintf_pdl(stream, pdls[target_num]);
 			counter++;
 		}
 	}
+    fprintf(stream, "total pdls num : %d\n\n", counter);
+    fclose(stream);
 
-	nwrite += sprintf(buf_mess + nwrite, "total pdls num : %d\n\n", counter);
-	buf_mess[nwrite] = '\0';
+//	data_len = strlen(buf_out + HEADER_LEN);
+//    sprintf(buf_out + OPCODE_LEN, "%d", data_len);
+	return buf_out;
 }
+
+static char* send_error_message(struct dummypdl* pdls, char* buf_data) {
+    char*   buf_out;
+    size_t  buf_out_len;
+    FILE*   stream = open_memstream(&buf_out, &buf_out_len);    
+
+    char op = OPCODE_MESSAGE;
+    int data_len = 0;
+    fwrite(&op,       1, 1, stream);
+    fwrite(&data_len, 4, 1, stream);
+    fprintf(stream, "OPCODE ERROR!!!\n");
+
+    fclose(stream);
+
+//	data_len = strlen(buf_out + HEADER_LEN);
+//    sprintf(buf_out + OPCODE_LEN, "%d", data_len);
+	return buf_out;
+}
+
+static PdlOperateFuncs process_ui_request[OPCODE__COUNT__ + 1] = {
+	ui_message_echo,                        // for test only
+	add_pdl, remove_pdl, list_pdl, get_pdl, //operations in real use
+    send_error_message                      //send error message
+};
+
 
 static int ui_control_onmessage(int* pt_ui_socket, const int server_socket, struct dummypdl* pdls) {
 	/*	if(select()) {	//미구현
@@ -160,22 +245,18 @@ static int ui_control_onmessage(int* pt_ui_socket, const int server_socket, stru
 	}*/
 
 	if(*pt_ui_socket == 0) {                    //need select() also
-		*pt_ui_socket = acceptUI(server_socket);
+		*pt_ui_socket = accept_ui(server_socket);
 	}
 
-	char buf_output[1024];
 	char buf_input[1024];                //1024 - >안전성 없음. 한방에 훅감.
-	char* buf_data = buf_input + HEADER_LEN;
-	char* buf_mess = buf_output + HEADER_LEN;
 	const int ui_socket = *pt_ui_socket;
 	uint32_t opcode, len;
 
-	memset(buf_output, 0x00, 1024);
 	memset(buf_input, 0x00, 1024);
 
 	testprintf("start reading packet\n");
 	//READ HEADER NOW
-	readAll(ui_socket, buf_input, HEADER_LEN);
+	read_all(ui_socket, buf_input, HEADER_LEN);
 	opcode = *(uint32_t*) buf_input;
 	len = be32toh(*(uint32_t*) (buf_input + OPCODE_LEN)); // = ntoh32(buf_input + OPCODE_LEN);
 
@@ -184,40 +265,35 @@ static int ui_control_onmessage(int* pt_ui_socket, const int server_socket, stru
 	testprintf("opcode : %d\nlen :%d == 0x%02x\n", opcode, len, len);
 
 	//READ DATA NOW
-	readAll(ui_socket, buf_data, len);
+	read_all(ui_socket, buf_input + HEADER_LEN, len);
 	testprintf("opcode : %d\nlen :%x\n", opcode, len);
-	testprintf(
-			"ui_input:\n%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+	testprintf("<ui send>\n0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
 			buf_input[0], buf_input[1], buf_input[2], buf_input[3], buf_input[4],
 			buf_input[5], buf_input[6], buf_input[7], buf_input[8], buf_input[9],
 			buf_input[10], buf_input[11], buf_input[12], buf_input[13], buf_input[14],
 			buf_input[15], buf_input[16], buf_input[17], buf_input[18], buf_input[19]);
 
 	//OPERATES BY OPCODE
-	pdl_operate_funcs ProcessUIRequest[LAST_OPCODE - FIRST_OPCODE + 1] = {
-			uiMessageEcho,    // for test only
-			addPdl, removePdl, listPdl, getPdl
-	};
-	if(FIRST_OPCODE <= opcode && opcode <= LAST_OPCODE) {
-		ProcessUIRequest[opcode](pdls, buf_data, buf_mess);
-	} else {
-		sprintf(buf_mess, "OPCODE ERROR!!!\n no op code : %d\n", opcode);
-	}//replying packet 'data' inputed too
+	if(opcode < 0 || OPCODE__COUNT__ <= opcode){//if OPCODE INPUT ERROR
+		opcode = OPCODE__COUNT__;//NO OPCODE LIKE THIS, temporary value for error message sending
+	}
+	char* buf_output = process_ui_request[opcode](pdls, buf_input + HEADER_LEN);
 
-	//replying packet 'header' now
-	buf_output[0] = OPCODE_MESSAGE;            //protocol 'opcode' input
-	u32tob(buf_output + OPCODE_LEN, strlen(buf_mess));
+	//filling 'header'
+	buf_output[0] = OPCODE_MESSAGE;
+	u32tob(buf_output + OPCODE_LEN, strlen(buf_output + HEADER_LEN));//only sending message to ui, possible to use strlen casus no '\0'in message
+	//IF disable headermaking here, should activate headermaking code in each  process_ui_request[]
 
 	//send reply to ui
-	writeAll(ui_socket, buf_output, strlen(buf_mess) + HEADER_LEN);
+	write_all(ui_socket, buf_output, strlen(buf_output + HEADER_LEN) + HEADER_LEN);
+    free(buf_output);
 
-	testprintf("buf_output header: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
+	testprintf("buf_output header&mess: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
 			   buf_output[0], buf_output[1], buf_output[2], buf_output[3], buf_output[4]);
-	testprintf("<buf_mess to ui>\n%s\n\n",
-			   buf_mess);                        //stdout display message(header not included)
-
+	testprintf("%s\n\n", buf_output + HEADER_LEN);    //stdout display message(header not included)
 	close(*pt_ui_socket);
-	*pt_ui_socket = NULL;
+	*pt_ui_socket = 0;
+    
 }
 
 int main(int argc, char** argv) {
@@ -227,16 +303,16 @@ int main(int argc, char** argv) {
 	int ui_socket = NULL;
 
 	memset(pdls, 0x00, 100 * sizeof(struct dummypdl));
-	server_socket = setServerSocket(/*~~~*/);            //create()~listen()
+	server_socket = set_socket(/*~~~*/);            //create()~listen()
 
 	while(1) {
 		ui_control_onmessage(&ui_socket, server_socket, pdls);
 
-		/*
-		*
-		*	run program here
-		*
-		*/
+		//==============================//
+		//								//
+		//		run program here		//
+		//								//
+		//==============================//
 
 		testprintf("[engine loop end]\n\n\n");
 	}
